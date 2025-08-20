@@ -58,7 +58,9 @@ param(
     [string]$PackageProfile = 'Standard',
     
     [Parameter(Mandatory = $false)]
-    [ValidatePattern('^https?://.*')]
+    [ValidateScript({
+        $_ -eq '' -or $_ -match '^https?://.*'
+    })]
     [string]$Mirror = '',
     
     [Parameter(Mandatory = $false)]
@@ -73,7 +75,9 @@ param(
 $Script:Config = @{
     SetupExecutableUrl = 'https://www.cygwin.com/setup-x86_64.exe'
     SetupExecutableName = 'setup-x86_64.exe'
-    DefaultMirrors = @(
+    MirrorDiscoveryUrl = 'https://mirrors.kernel.org/sourceware/cygwin/'
+    MirrorListUrl = 'https://cygwin.com/mirrors.html'
+    FallbackMirrors = @(
         'https://mirrors.kernel.org/sourceware/cygwin/',
         'https://mirror.clarkson.edu/cygwin/',
         'https://cygwin.mirror.constant.com/',
@@ -81,6 +85,7 @@ $Script:Config = @{
     )
     RetryAttempts = 3
     TimeoutSeconds = 300
+    MirrorTestTimeout = 15
 }
 
 # Package selection matrices organized by installation type and profile
@@ -585,10 +590,74 @@ function Initialize-DirectoryStructure {
 # NETWORK OPERATIONS AND DOWNLOAD MANAGEMENT
 # ============================================================================
 
+function Get-CygwinMirrorList {
+    <#
+    .SYNOPSIS
+        Retrieves comprehensive Cygwin mirror list from authoritative sources with fallback mechanisms
+    #>
+    [CmdletBinding()]
+    param()
+    
+    Write-InstallLog "Discovering Cygwin mirrors from authoritative sources"
+    
+    $discoveredMirrors = @()
+    
+    # Primary discovery: mirrors.kernel.org authoritative source
+    try {
+        Write-InstallLog "Querying mirrors.kernel.org for comprehensive mirror list"
+        $mirrorResponse = Invoke-WebRequest -Uri $Script:Config.MirrorListUrl -TimeoutSec 10 -UseBasicParsing
+        
+        # Parse mirror list from HTML content
+        $mirrorMatches = [regex]::Matches($mirrorResponse.Content, 'href="(https?://[^"]+/cygwin/?)"')
+        
+        foreach ($match in $mirrorMatches) {
+            $mirrorUrl = $match.Groups[1].Value
+            if ($mirrorUrl -notmatch 'cygwin\.com' -and $mirrorUrl -notin $discoveredMirrors) {
+                $discoveredMirrors += $mirrorUrl
+            }
+        }
+        
+        Write-InstallLog "Discovered $($discoveredMirrors.Count) mirrors from official source"
+    }
+    catch {
+        Write-InstallLog "Primary mirror discovery failed: $($_.Exception.Message)" -Level 'WARN'
+    }
+    
+    # Secondary discovery: direct kernel.org mirror verification
+    try {
+        $kernelMirror = $Script:Config.MirrorDiscoveryUrl
+        $testResponse = Invoke-WebRequest -Uri $kernelMirror -Method Head -TimeoutSec 5 -UseBasicParsing
+        if ($testResponse.StatusCode -eq 200 -and $kernelMirror -notin $discoveredMirrors) {
+            $discoveredMirrors = @($kernelMirror) + $discoveredMirrors
+            Write-InstallLog "Verified mirrors.kernel.org availability" -Level 'SUCCESS'
+        }
+    }
+    catch {
+        Write-InstallLog "Kernel.org mirror verification failed: $($_.Exception.Message)" -Level 'WARN'
+    }
+    
+    # Fallback mechanism: use curated fallback mirrors
+    if ($discoveredMirrors.Count -eq 0) {
+        Write-InstallLog "Using fallback mirror configuration" -Level 'WARN'
+        $discoveredMirrors = $Script:Config.FallbackMirrors
+    }
+    else {
+        # Supplement with fallback mirrors for redundancy
+        foreach ($fallbackMirror in $Script:Config.FallbackMirrors) {
+            if ($fallbackMirror -notin $discoveredMirrors) {
+                $discoveredMirrors += $fallbackMirror
+            }
+        }
+    }
+    
+    Write-InstallLog "Mirror discovery completed: $($discoveredMirrors.Count) total mirrors available"
+    return $discoveredMirrors
+}
+
 function Get-OptimalMirror {
     <#
     .SYNOPSIS
-        Determines the fastest available Cygwin mirror through latency testing
+        Determines the fastest available Cygwin mirror through comprehensive latency testing
     #>
     [CmdletBinding()]
     param()
@@ -598,20 +667,43 @@ function Get-OptimalMirror {
         return $Mirror
     }
     
-    Write-InstallLog "Testing mirror latency for optimal selection"
+    Write-InstallLog "Initiating optimal mirror selection process"
+    
+    # Discover available mirrors dynamically
+    $availableMirrors = Get-CygwinMirrorList
+    
+    if ($availableMirrors.Count -eq 0) {
+        throw "No Cygwin mirrors available for testing"
+    }
+    
+    Write-InstallLog "Testing $($availableMirrors.Count) mirrors for optimal performance"
     $bestMirror = $null
     $bestLatency = [int]::MaxValue
+    $testedCount = 0
+    $successfulTests = 0
     
-    foreach ($testMirror in $Script:Config.DefaultMirrors) {
+    foreach ($testMirror in $availableMirrors) {
+        $testedCount++
+        Write-Progress -Activity "Testing Mirrors" -Status "Testing mirror $testedCount of $($availableMirrors.Count)" -PercentComplete (($testedCount / $availableMirrors.Count) * 100)
+        
         try {
             $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-            $response = Invoke-WebRequest -Uri $testMirror -Method Head -TimeoutSec 10 -UseBasicParsing
+            $response = Invoke-WebRequest -Uri $testMirror -Method Head -TimeoutSec $Script:Config.MirrorTestTimeout -UseBasicParsing
             $stopwatch.Stop()
             
-            if ($response.StatusCode -eq 200 -and $stopwatch.ElapsedMilliseconds -lt $bestLatency) {
-                $bestLatency = $stopwatch.ElapsedMilliseconds
-                $bestMirror = $testMirror
-                Write-InstallLog "Mirror [$testMirror] responded in ${bestLatency}ms" -Level 'INFO'
+            if ($response.StatusCode -eq 200) {
+                $successfulTests++
+                $latency = $stopwatch.ElapsedMilliseconds
+                
+                if ($latency -lt $bestLatency) {
+                    $bestLatency = $latency
+                    $bestMirror = $testMirror
+                }
+                
+                Write-InstallLog "Mirror [$testMirror] responded in ${latency}ms" -Level 'INFO'
+            }
+            else {
+                Write-InstallLog "Mirror [$testMirror] returned status code $($response.StatusCode)" -Level 'WARN'
             }
         }
         catch {
@@ -619,12 +711,16 @@ function Get-OptimalMirror {
         }
     }
     
+    Write-Progress -Activity "Testing Mirrors" -Completed
+    
     if (-not $bestMirror) {
-        $bestMirror = $Script:Config.DefaultMirrors[0]
-        Write-InstallLog "Using fallback mirror: $bestMirror" -Level 'WARN'
+        # Emergency fallback to first available mirror
+        $bestMirror = $availableMirrors[0]
+        Write-InstallLog "No responsive mirrors found, using emergency fallback: $bestMirror" -Level 'WARN'
     }
     else {
-        Write-InstallLog "Selected optimal mirror: $bestMirror (${bestLatency}ms)" -Level 'SUCCESS'
+        Write-InstallLog "Optimal mirror selected: $bestMirror (${bestLatency}ms latency)" -Level 'SUCCESS'
+        Write-InstallLog "Mirror testing statistics: $successfulTests/$testedCount mirrors responsive" -Level 'INFO'
     }
     
     return $bestMirror
