@@ -1,0 +1,143 @@
+#!/bin/sh
+#based on https://github.com/buffer/thug/blob/master/doc/source/build.rst
+
+echo "Installing needed libraries and tools..."
+sudo apt-get install scons python-software-properties libapache2-mod-php5 php-pear php5-dev php5-curl php5-mcrypt zip php5-mongo subversion git python build-essential python-setuptools libboost-python-dev libboost-dev libboost-thread-dev libboost-system-dev python-dev build-essential git-core autoconf libtool   python-html5lib beautifulsoup4 nano g++ bison flex libncurses5-dev zlib1g-dev 
+echo "Installing pip..."
+sudo easy_install pip
+
+echo 'Please wait, checking out subversion repo for [http://v8.googlecode.com/svn/trunk/]...'
+svn checkout http://v8.googlecode.com/svn/trunk/ v8 1>setup-ubuntu.log
+
+echo 'Patching V8...'
+patch -p0 < ../patches/V8-patch1.diff 1>>setup-ubuntu.log
+
+
+echo 'Please wait, checking out subversion repo for [-r478 http://pyv8.googlecode.com/svn/trunk/]...'
+svn checkout http://pyv8.googlecode.com/svn/trunk/ pyv8 1>>setup-ubuntu.log
+
+
+echo 'Setting environment variable...'
+cd v8
+export V8_HOME=`pwd`
+cd ..
+#export V8_HOME=`pwd`/v8
+#echo "V8_HOME = \"$PWD/v8\"" >> pyv8/buildconf.py
+#echo "DEBUG = True" >> pyv8/buildconf.py
+#echo "V8_SVN_REVISION = 14110" >> pyv8/buildconf.py
+
+echo "Building PyV8 and V8(this may take several minutes)..."
+cd pyv8
+python setup.py build
+
+echo "Installing PyV8 and V8..."
+sudo python setup.py install
+	
+cd ..
+
+echo "Installing python libraries (beautifulsoup4, html5lib)..."
+sudo pip install beautifulsoup4 1>>setup-ubuntu.log
+sudo pip install html5lib 1>>setup-ubuntu.log
+
+echo 'Please wait, cloning git repo for [git://git.carnivore.it/libemu.git]...'
+git clone git://git.carnivore.it/libemu.git 1>>setup-ubuntu.log
+
+echo "Configuring libemu..."
+cd libemu
+autoreconf -v -i
+./configure --prefix=/opt/libemu 1>>setup-ubuntu.log
+echo "Installing libemu..."
+sudo make install 1>>setup-ubuntu.log
+sudo ldconfig -n /opt/libemu/lib
+cd ..
+
+echo 'Please wait, cloning git repo for [git://github.com/buffer/pylibemu.git]...'
+git clone git://github.com/buffer/pylibemu.git 1>>setup-ubuntu.log
+echo "Building pylibemu..."
+cd pylibemu
+sudo sh -c "echo /opt/libemu/lib/ > /etc/ld.so.conf.d/pylibemu.conf"
+python setup.py build 1>>setup-ubuntu.log
+echo "Installing pylibemu..."
+sudo python setup.py install 1>>setup-ubuntu.log
+sudo ldconfig
+cd ..
+
+echo "Installing python libraries..."
+echo "Installing python library: pefile..."
+sudo pip install pefile 1>>setup-ubuntu.log
+	
+echo "Installing python library: chardet..."
+sudo pip install chardet 1>>setup-ubuntu.log
+	
+echo "Installing python library: httplib2..."
+sudo pip install httplib2 1>>setup-ubuntu.log
+	
+echo "Installing python library: cssutils..."
+sudo pip install cssutils 1>>setup-ubuntu.log
+	
+echo "Installing python library: zope..."
+sudo pip install zope.interface 1>>setup-ubuntu.log
+	
+echo "Installing python library: cssutils..."
+sudo pip install cssutils 1>>setup-ubuntu.log
+
+echo "Installing graphviz..."
+add-apt-repository ppa:gviz-adm/graphviz-dev
+apt-get update
+sudo apt-get install graphviz
+
+echo "Installing python library: lxml..."
+sudo apt-get install python-lxml python-lxml-dbg
+
+echo "Installing python libraries..."
+echo "Installing python library: pyparsing==1.5.7..."
+sudo easy_install pyparsing==1.5.7
+	
+echo "Installing python library: pydot..."
+sudo pip install pydot 1>>setup-ubuntu.log
+	
+echo "Installing python library: python-magic..."
+sudo pip install python-magic 1>>setup-ubuntu.log
+
+echo "Installing python library: rarfile..."
+sudo pip install rarfile 1>>setup-ubuntu.log
+
+echo "Installing python library: jsbeautifier..."
+sudo pip install jsbeautifier 1>>setup-ubuntu.log
+
+echo "Installing python library: requests..."
+sudo pip install requests 1>>setup-ubuntu.log
+
+echo "Installing Yara"
+cd /opt/
+git clone git://github.com/plusvic/yara.git 1>>setup-ubuntu.log
+cd yara
+chmod +x build.sh 1>>setup-ubuntu.log
+./build.sh 1>>setup-ubuntu.log
+make install 1>>setup-ubuntu.log
+ldconfig 1>>setup-ubuntu.log
+cd yara-python
+python setup.py build 1>>setup-ubuntu.log
+python setup.py install 1>>setup-ubuntu.log
+cd /opt/
+
+echo "Installing python library: yara..."
+sudo pip install yara 1>>setup-ubuntu.log
+
+echo -n "Install MongoDB?(y/n): "
+read response
+if [ "$response" = "y" ]; then
+	echo "Installing MongoDB & PyMongo..."
+	sudo apt-get install mongodb
+	sudo pip install pymongo
+fi
+
+echo -n "Install RabbitMQ?(y/n): "
+read response
+if [ "$response" = "y" ]; then
+	echo "Installing RabbitMQ & pika..."
+	sudo apt-get install rabbitmq-server
+	sudo pip install pika
+fi
+
+service apache2 restart
