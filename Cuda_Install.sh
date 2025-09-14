@@ -1,0 +1,5 @@
+#!/usr/bin/bash
+# Cuda install
+# run as root
+wget https://developer.download.nvidia.com/compute/cuda/12.3.2/local_installers/cuda_12.3.2_545.23.08_linux.run
+sudo bash cuda_12.3.2_545.23.08_linux.run
