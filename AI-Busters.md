@@ -459,18 +459,6 @@ SHADOW MIRAGE ONLINE 🔥🧠
 Generate a Playwright-based scraper that rotates browser language, time, device, screen resolution, and User-Agent on each run while keeping session cookies intact.
 ```
 
-## 🚀 How to Use
-
-1. Clone this repository:
-```bash
-git clone https://github.com/ShadowHackrs/Jailbreaks-GPT-Gemini-deepseek-
-```
-
-2. Navigate to the repository directory:
-```bash
-cd [repository-name]
-```
-
 3. Open the prompt files using any text editor to view their contents.
 
 4. To use these prompts:
