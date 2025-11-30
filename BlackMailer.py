@@ -117,7 +117,6 @@ def showSyntax(args):
     print ("     -port <number>                 SMTP port to use. Defauls to 25")
     print ("     -v                             verbose output")
     print ("     -html                          send body as HTML")
-    print ("     -noupdate                      don't update via 'git pull' at startup")
     print ("")
     return
 
