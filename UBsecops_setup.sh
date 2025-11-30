@@ -94,10 +94,12 @@ phase_system_update() {
 
 phase_development_tools() {
     display_status "INFO" "Installing essential development tools..."
-    install_packages build-essential apt-file aptitude cmake git curl wget htop bpytop speedtest-cli nload iperf3 neofetch vim nano \
-        software-properties-common apt-transport-https ca-certificates net-tools wireless-tools flex ninja-build byacc screen electric-fence \
-        gnupg2 lsb-release dirmngr rar unzip zip p7zip-full p7zip-rar bzip2 net-tools binutils coreutils mtools atool xz-utils sleuthkit \
-        tree file gmpc traceroute iproute2 strace ltrace
+    install_packages build-essential apt-file aptitude cmake git curl wget htop bpytop speedtest-cli nload iperf3 hping3 neofetch vim nano \
+        software-properties-common apt-transport-https ca-certificates net-tools wireless-tools flex bison rhino ninja-build byacc screen electric-fence \
+        gnupg2 lsb-release dirmngr rar unzip zip p7zip-full p7zip-rar bzip2 geoip-bin libgeoip-dev net-tools binutils coreutils mtools atool xz-utils sleuthkit \
+        tree filters menu pass file gmpc traceroute iproute2 strace ltrace pax pxelinux gmpc-plugins gmpc-dev binfmt-support qemu-user-static uml-utilities bridge-utils net-tools \ 
+        gnupg gnupg2 wget curl ca-certificates lsb-release software-properties-common apt-transport-https g++ python3 python3-dev python3-setuptools pkg-config cmake ninja-build git-all git-lfs \ 
+        python3-pip python-is-python3 autoconf cvs bzr unzip p7zip-full libc6-dev libclang-dev llvm-dev automake libffi-dev python-gitlab-doc brz-doc
 }
 
 phase_external_repositories() {
@@ -109,7 +111,7 @@ phase_external_repositories() {
 
 phase_shell_environments() {
     display_status "INFO" "Installing advanced shell environments..."
-    install_packages tix bash-completion patchelf subversion subversion-tools w3m lolcat cowsay figlet toilet fish zsh tmux screen
+    install_packages tix fizsh zsh zsh-doc bash-completion patchelf subversion subversion-tools w3m lolcat cowsay figlet toilet fish screenie tmux screen
 }
 
 phase_cross_compilation() {
@@ -121,7 +123,7 @@ phase_cross_compilation() {
 phase_programming_languages() {
     display_status "INFO" "Installing programming language runtimes..."
     install_packages python3 python3-pip python2-dev python3-full python3-paramiko python3-venv python3-cryptography \
-        python2-setuptools python-is-python3 dos2unix nodejs npm \
+        python2-setuptools python-is-python3 2to3 dos2unix nodejs npm \
         libssh2-1-dev libssl-dev libcrypt-dev libz-dev libpq-dev libmariadb-dev libffi-dev pkg-config cmdtest filters menu pass libxml2-dev libxslt1-dev \
         perl perl-modules-5.34 cpanminus php-pear php-dev php-ssh2 libnet-ssleay-perl libio-socket-ssl-perl libwww-perl libxml-parser-perl
 }
@@ -160,7 +162,7 @@ EOF
 
 phase_go_installation() {
     display_status "INFO" "Installing Go programming language..."
-    GO_VERSION="1.24.5"
+    GO_VERSION="1.25.1"
     GO_ARCHIVE="/tmp/go${GO_VERSION}.linux-amd64.tar.gz"
     wget -q -O "${GO_ARCHIVE}" "https://golang.org/dl/go${GO_VERSION}.linux-amd64.tar.gz"
     rm -rf /usr/local/go
@@ -178,7 +180,7 @@ phase_rust_installation() {
     export CARGO_HOME="/opt/cargo"
     mkdir -p "$RUSTUP_HOME" "$CARGO_HOME"
 
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain stable >/dev/null 2>&1
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --default-toolchain nightly >/dev/null 2>&1
 
     cat >> /etc/profile << 'EOF'
 
@@ -206,19 +208,19 @@ phase_monitoring_tools() {
 
 phase_docker_installation() {
     display_status "INFO" "Installing Docker platform..."
-    install_packages docker docker.io containerd docker-compose docker-compose-plugin docker-buildx docker-clean docker-registry
+    install_packages docker docker.io containerd docker-compose docker-compose-v2 composer docker-compose-plugin docker-buildx docker-clean docker-registry
     systemctl enable docker >/dev/null 2>&1
     systemctl start docker >/dev/null 2>&1
 }
 
 phase_development_environment() {
     display_status "INFO" "Installing development environment tools..."
-    install_packages git git-lfs git-all vim neovim texlive-bin python3-sphinx lynx google-chrome-stable terraform kubectl
+    install_packages git git-lfs git-all vim neovim texlive-bin python3-sphinx sphinx-doc doc-base sqdoc sq lynx chromium-chromedriver google-chrome-stable terraform kubectl
 }
 
 phase_database_tools() {
     display_status "INFO" "Installing database client utilities..."
-    install_packages sqlite3 postgresql-client ruredis-server redis-tools
+    install_packages sqlite3 postgresql-client ruby-redis ruby-dev ri rake-compiler bundler redis-server redis-tools
 }
 
 phase_apache_installation() {
@@ -264,12 +266,12 @@ EOF
 
 phase_pentesting_tools() {
     display_status "INFO" "Installing penetration testing tools..."
-    install_packages hydra john hashcat aircrack-ng masscan medusa ncrack sqlmap nikto dirb gobuster wpscan pscan smbclient proxychains-ng bloodhound neo4j
+    install_packages hydra john hashcat aircrack-ng masscan medusa proxychains4 hashcat socat proxychains-ng ncrack sqlmap nikto dirb gobuster wpscan pscan smbclient proxychains-ng libpcap-dev patator neo4j
 }
 
 phase_python_libraries() {
     display_status "INFO" "Installing Python security libraries..."
-    pip3 install --quiet scapy requests beautifulsoup4 paramiko pycryptodome impacket netaddr whois colorama termcolor pwntools selenium shodan censys dnspython python-whois
+    pip3 install --quiet wheel setuptools build scipy scrapy bs4 tqdm mechanicalsoup mechanize tor torrequest scapy requests beautifulsoup4 paramiko pycryptodome impacket netaddr whois colorama termcolor pwntools selenium shodan censys dnspython python-whois
 }
 
 phase_fish_configuration() {
@@ -277,7 +279,7 @@ phase_fish_configuration() {
 
     fish -c "curl -sL https://git.io/fisher | source && fisher install jorgebucaran/fisher" >/dev/null 2>&1
     curl -L https://raw.githubusercontent.com/oh-my-fish/oh-my-fish/master/bin/install | fish >/dev/null 2>&1
-    fish -c "fisher install edc/bass franciscolourenco/done jethrokuan/z" >/dev/null 2>&1
+    
 
     mkdir -p /etc/fish
     cat > /etc/fish/config.fish << 'EOF'
