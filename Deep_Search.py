@@ -354,7 +354,7 @@ Customizable personal search operator selection
             print(f"{Fore.GREEN}[+] You can use the saved file to run searches later{Style.RESET_ALL}")
         
         print(f"{Fore.GREEN}[✓] Google OSINT investigation completed successfully!{Style.RESET_ALL}")
-        print(f"{Fore.YELLOW}[!] Tool created by D4rk_Intel{Style.RESET_ALL}")
+        print(f"{Fore.YELLOW}[!] Simple Structured Output for +Deep-Divin+{Style.RESET_ALL}")
 
 def main():
     """Main execution function"""
